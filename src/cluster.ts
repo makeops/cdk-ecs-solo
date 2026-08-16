@@ -24,6 +24,7 @@ export class SoloEC2Cluster extends Construct {
   private readonly id: string;
   public controlPlane?: SoloClusterControlPlane;
   public readonly namespace: servicediscovery.HttpNamespace;
+  public readonly clusterSecurityGroup: ec2.SecurityGroup;
 
   constructor(scope: Construct, id: string, props: SoloEC2ClusterProps) {
     super(scope, id);
@@ -81,6 +82,8 @@ export class SoloEC2Cluster extends Construct {
       description: 'Security group for the instance',
       allowAllOutbound: true,
     });
+
+    this.clusterSecurityGroup = instanceSecurityGroup;
 
     const launchTemplate = new ec2.LaunchTemplate(this, `${id}/launch_template`, {
       machineImage: ec2.MachineImage.fromSsmParameter(machineImageSsmParameter),
@@ -189,6 +192,11 @@ export class SoloEC2Cluster extends Construct {
       hostPort: 443,
     });
 
+    caddy.addPortMappings({
+      containerPort: 2019,
+      hostPort: 2019,
+    });
+
     new ecs.CfnService(this, `${this.id}/ingress`, {
       availabilityZoneRebalancing: ecs.AvailabilityZoneRebalancing.DISABLED,
       cluster: this.clusterName,
@@ -201,8 +209,8 @@ export class SoloEC2Cluster extends Construct {
       },
       serviceConnectConfiguration: {
         enabled: true,
-        namespace: namespace.namespaceArn
-      }
+        namespace: namespace.namespaceArn,
+      },
     });
 
   }

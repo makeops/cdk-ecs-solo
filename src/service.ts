@@ -1,5 +1,5 @@
 import { CustomResource } from 'aws-cdk-lib';
-import { AppProtocol, AvailabilityZoneRebalancing, CfnService, ContainerImage, Ec2TaskDefinition, LogDriver, Protocol, Secret } from 'aws-cdk-lib/aws-ecs';
+import { AvailabilityZoneRebalancing, CfnService, ContainerImage, Ec2TaskDefinition, LogDriver, Protocol, Secret } from 'aws-cdk-lib/aws-ecs';
 import { RetentionDays } from 'aws-cdk-lib/aws-logs';
 import { HttpNamespace } from 'aws-cdk-lib/aws-servicediscovery';
 import { Provider } from 'aws-cdk-lib/custom-resources';
@@ -46,8 +46,7 @@ export class SoloEc2Service extends Construct {
           containerPort: externalPort,
           name: 'exposed-port',
           protocol: Protocol.TCP,
-          appProtocol: AppProtocol.http
-        }
+        },
       ],
       ...(environment ? { environment } : {}),
       ...(secrets ? { secrets } : {}),
@@ -71,9 +70,9 @@ export class SoloEc2Service extends Construct {
           portName: 'exposed-port',
           clientAliases: [{
             port: externalPort,
-          }]
-        }]
-      }
+          }],
+        }],
+      },
     });
 
   }
@@ -81,7 +80,7 @@ export class SoloEc2Service extends Construct {
 
 
 export interface SoloExposeServiceProps {
-  readonly provider: Provider
+  readonly provider: Provider;
   readonly serviceName: string;
   readonly clusterName: string;
 }
@@ -96,8 +95,8 @@ export class SoloExposeService extends Construct {
       serviceToken: provider.serviceToken,
       resourceType: 'Custom::SoloExposeService',
       properties: {
-        serviceName: `${clusterName}-${serviceName}`
-      }
+        serviceName: `${clusterName}-${serviceName}`,
+      },
     });
 
   }

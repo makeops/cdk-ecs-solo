@@ -1,12 +1,13 @@
 import { resolve } from 'path';
-import { SecurityGroup, Vpc } from 'aws-cdk-lib/aws-ec2';
+import { Port, SecurityGroup, Vpc } from 'aws-cdk-lib/aws-ec2';
 import { Function, Runtime } from 'aws-cdk-lib/aws-lambda';
 import { NodejsFunction } from 'aws-cdk-lib/aws-lambda-nodejs';
-import { Construct } from 'constructs';
 import { Provider } from 'aws-cdk-lib/custom-resources';
+import { Construct } from 'constructs';
 
 export interface SoloClusterControlPlaneProps {
   readonly clusterName: string;
+  readonly clusterSecurityGroup: SecurityGroup;
 }
 
 export class SoloClusterControlPlane extends Construct {
@@ -18,7 +19,7 @@ export class SoloClusterControlPlane extends Construct {
   constructor(scope: Construct, id: string, props: SoloClusterControlPlaneProps) {
     super(scope, id);
 
-    const { clusterName } = props;
+    const { clusterName, clusterSecurityGroup } = props;
 
     const vpc = Vpc.fromLookup(this, `${id}/vpc`, {
       isDefault: true,
@@ -29,6 +30,8 @@ export class SoloClusterControlPlane extends Construct {
       description: 'Security group for the control plane',
       allowAllOutbound: true,
     });
+
+    clusterSecurityGroup.connections.allowFrom(securityGroup, Port.tcp(2019), 'Allow Caddy Management traffic');
 
     const controlPlane = new NodejsFunction(this, `${id}/control_plane/function`, {
       entry: resolve(__dirname, '..', 'src', 'control-plane', 'index.mts'),
@@ -49,7 +52,7 @@ export class SoloClusterControlPlane extends Construct {
 
     this.provider = new Provider(this, `${id}--control-plane--provider`, {
       onEventHandler: controlPlane,
-    })
+    });
 
   }
 }
