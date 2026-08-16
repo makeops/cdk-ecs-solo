@@ -3,6 +3,7 @@ import { SecurityGroup, Vpc } from 'aws-cdk-lib/aws-ec2';
 import { Function, Runtime } from 'aws-cdk-lib/aws-lambda';
 import { NodejsFunction } from 'aws-cdk-lib/aws-lambda-nodejs';
 import { Construct } from 'constructs';
+import { Provider } from 'aws-cdk-lib/custom-resources';
 
 export interface SoloClusterControlPlaneProps {
   readonly clusterName: string;
@@ -11,6 +12,8 @@ export interface SoloClusterControlPlaneProps {
 export class SoloClusterControlPlane extends Construct {
 
   public readonly controlPlane: Function;
+
+  public readonly provider: Provider;
 
   constructor(scope: Construct, id: string, props: SoloClusterControlPlaneProps) {
     super(scope, id);
@@ -43,6 +46,10 @@ export class SoloClusterControlPlane extends Construct {
     });
 
     this.controlPlane = controlPlane as Function;
+
+    this.provider = new Provider(this, `${id}--control-plane--provider`, {
+      onEventHandler: controlPlane,
+    })
 
   }
 }
