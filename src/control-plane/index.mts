@@ -1,3 +1,4 @@
+import { request } from 'node:http';
 import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import {
   DiscoverInstancesCommand,
@@ -16,6 +17,8 @@ interface ExposeServiceProperties {
   serviceName: string;
   namespaceArn: string;
   port: string | number;
+  domain: string;
+  additionalDomains?: string | string[];
 }
 
 interface CloudFormationEvent {
@@ -128,24 +131,71 @@ async function findIngressIpv4(namespaceName: string, serviceName: string): Prom
   return ipv4;
 }
 
-async function caddyRequest(ip: string, method: string, path: string, body?: unknown): Promise<unknown> {
-  const response = await fetch(`http://${ip}:${CADDY_ADMIN_PORT}${path}`, {
-    method,
-    headers: body === undefined ? undefined : { 'Content-Type': 'application/json' },
-    body: body === undefined ? undefined : JSON.stringify(body),
-  });
+async function caddyHttp(ip: string, method: string, path: string, body?: unknown): Promise<{ status: number; text: string }> {
+  const payload = body === undefined ? undefined : JSON.stringify(body);
 
-  const text = await response.text();
-  if (!response.ok) {
-    throw new Error(`Caddy ${method} ${path} failed (${response.status}): ${text}`);
+  return new Promise((resolve, reject) => {
+    const req = request({
+      host: ip,
+      port: CADDY_ADMIN_PORT,
+      path,
+      method,
+      headers: payload === undefined ? undefined : {
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(payload),
+      },
+    }, (res) => {
+      const chunks: Buffer[] = [];
+      res.on('data', (chunk) => chunks.push(chunk));
+      res.on('end', () => {
+        resolve({
+          status: res.statusCode ?? 0,
+          text: Buffer.concat(chunks).toString('utf8'),
+        });
+      });
+    });
+
+    req.setTimeout(5_000, () => {
+      req.destroy(new Error(`Caddy ${method} ${path} timed out`));
+    });
+    req.on('error', reject);
+    if (payload !== undefined) {
+      req.write(payload);
+    }
+    req.end();
+  });
+}
+
+async function caddyRequest(ip: string, method: string, path: string, body?: unknown): Promise<unknown> {
+  const { status, text } = await caddyHttp(ip, method, path, body);
+  if (status < 200 || status >= 300) {
+    throw new Error(`Caddy ${method} ${path} failed (${status}): ${text}`);
   }
 
   return text ? JSON.parse(text) : undefined;
 }
 
-function reverseProxyRoute(serviceName: string, namespaceName: string, port: string | number) {
+function additionalDomainsOf(props: ExposeServiceProperties): string[] {
+  const value = props.additionalDomains;
+  if (value === undefined || value === '') {
+    return [];
+  }
+  if (typeof value === 'string') {
+    return value.split(',').map((name) => name.trim()).filter(Boolean);
+  }
+  return value.map((name) => name.trim()).filter(Boolean);
+}
+
+function canonicalRouteId(serviceName: string): string {
+  return `${serviceName}--canonical`;
+}
+
+function reverseProxyRoute(serviceName: string, namespaceName: string, port: string | number, domain: string) {
   return {
     '@id': serviceName,
+    match: [{
+      host: [domain],
+    }],
     handle: [{
       handler: 'reverse_proxy',
       upstreams: [{
@@ -155,17 +205,33 @@ function reverseProxyRoute(serviceName: string, namespaceName: string, port: str
   };
 }
 
-async function upsertCaddyRoute(ip: string, route: ReturnType<typeof reverseProxyRoute>): Promise<void> {
-  const routeId = encodeURIComponent(String(route['@id']));
-  const existing = await fetch(`http://${ip}:${CADDY_ADMIN_PORT}/id/${routeId}`);
+function canonicalRedirectRoute(serviceName: string, domain: string, additionalDomains: string[]) {
+  return {
+    '@id': canonicalRouteId(serviceName),
+    match: [{
+      host: additionalDomains,
+    }],
+    handle: [{
+      handler: 'static_response',
+      status_code: 308,
+      headers: {
+        Location: [`https://${domain}{http.request.uri}`],
+      },
+    }],
+  };
+}
 
-  if (existing.ok) {
+async function upsertCaddyRoute(ip: string, route: { '@id': string }): Promise<void> {
+  const routeId = encodeURIComponent(String(route['@id']));
+  const existing = await caddyHttp(ip, 'GET', `/id/${routeId}`);
+
+  if (existing.status >= 200 && existing.status < 300) {
     await caddyRequest(ip, 'PATCH', `/id/${routeId}`, route);
     return;
   }
 
   if (existing.status !== 404) {
-    throw new Error(`Caddy GET /id/${routeId} failed (${existing.status}): ${await existing.text()}`);
+    throw new Error(`Caddy GET /id/${routeId} failed (${existing.status}): ${existing.text}`);
   }
 
   await caddyRequest(ip, 'PUT', '/config/apps/http/servers/srv0/routes/0', route);
@@ -173,22 +239,27 @@ async function upsertCaddyRoute(ip: string, route: ReturnType<typeof reverseProx
 
 async function deleteCaddyRoute(ip: string, routeId: string): Promise<void> {
   const encoded = encodeURIComponent(routeId);
-  const response = await fetch(`http://${ip}:${CADDY_ADMIN_PORT}/id/${encoded}`, {
-    method: 'DELETE',
-  });
+  const { status, text } = await caddyHttp(ip, 'DELETE', `/id/${encoded}`);
 
-  if (response.ok || response.status === 404) {
-    if (response.status === 404) {
-      console.log(`Caddy route ${routeId} already absent`);
-    }
+  if (status >= 200 && status < 300) {
+    return;
+  }
+  if (status === 404) {
+    console.log(`Caddy route ${routeId} already absent`);
     return;
   }
 
-  throw new Error(`Caddy DELETE /id/${encoded} failed (${response.status}): ${await response.text()}`);
+  throw new Error(`Caddy DELETE /id/${encoded} failed (${status}): ${text}`);
 }
 
 function networkErrorCode(error: unknown): string | undefined {
-  if (!(error instanceof Error) || error.cause === undefined || error.cause === null || typeof error.cause !== 'object') {
+  if (!(error instanceof Error)) {
+    return undefined;
+  }
+  if ('code' in error && typeof error.code === 'string') {
+    return error.code;
+  }
+  if (error.cause === undefined || error.cause === null || typeof error.cause !== 'object') {
     return undefined;
   }
   if (!('code' in error.cause) || typeof error.cause.code !== 'string') {
@@ -198,10 +269,6 @@ function networkErrorCode(error: unknown): string | undefined {
 }
 
 function isUnreachable(error: unknown): boolean {
-  if (error instanceof TypeError) {
-    return true;
-  }
-
   const code = networkErrorCode(error);
   return code !== undefined && ['ECONNREFUSED', 'ETIMEDOUT', 'ENETUNREACH', 'EHOSTUNREACH', 'ECONNRESET'].includes(code);
 }
@@ -227,20 +294,41 @@ async function persistCaddyConfig(ip: string): Promise<void> {
   }));
 }
 
-async function exposeService(event: CloudFormationEvent) {
-  const { serviceName, namespaceArn, port } = event.ResourceProperties;
+async function ensureHttpsListen(ip: string): Promise<void> {
+  const listen = await caddyRequest(ip, 'GET', '/config/apps/http/servers/srv0/listen');
+  const current = Array.isArray(listen) ? listen.map(String) : [];
+  if (current.some((address) => address === '0.0.0.0:443' || address === ':443')) {
+    return;
+  }
 
-  if (!serviceName || !namespaceArn || port === undefined || port === '') {
-    throw new Error('serviceName, namespaceArn, and port are required');
+  await caddyRequest(ip, 'POST', '/config/apps/http/servers/srv0/listen', '0.0.0.0:443');
+}
+
+async function exposeService(event: CloudFormationEvent) {
+  const { serviceName, namespaceArn, port, domain } = event.ResourceProperties;
+  const additionalDomains = additionalDomainsOf(event.ResourceProperties);
+
+  if (!serviceName || !namespaceArn || port === undefined || port === '' || !domain) {
+    throw new Error('serviceName, namespaceArn, port, and domain are required');
   }
 
   const { namespace, ingressIp } = await resolveIngress(namespaceArn);
 
-  await upsertCaddyRoute(ingressIp, reverseProxyRoute(serviceName, namespace.name, port));
+  console.log(`Exposing ${serviceName} at https://${domain}` + (additionalDomains.length > 0 ? ` (redirects from ${additionalDomains.join(', ')})` : ''));
+
+  await ensureHttpsListen(ingressIp);
+  await upsertCaddyRoute(ingressIp, reverseProxyRoute(serviceName, namespace.name, port, domain));
+
+  if (additionalDomains.length > 0) {
+    await upsertCaddyRoute(ingressIp, canonicalRedirectRoute(serviceName, domain, additionalDomains));
+  } else {
+    await deleteCaddyRoute(ingressIp, canonicalRouteId(serviceName));
+  }
 
   const previousName = event.OldResourceProperties?.serviceName;
   if (event.RequestType === 'Update' && previousName && previousName !== serviceName) {
     await deleteCaddyRoute(ingressIp, previousName);
+    await deleteCaddyRoute(ingressIp, canonicalRouteId(previousName));
   }
 
   await persistCaddyConfig(ingressIp);
@@ -248,6 +336,7 @@ async function exposeService(event: CloudFormationEvent) {
   return cfnSuccess(event, serviceName, {
     IngressIp: ingressIp,
     Upstream: `${serviceName}.${namespace.name}:${port}`,
+    Domain: domain,
   });
 }
 
@@ -274,6 +363,7 @@ async function unexposeService(event: CloudFormationEvent, context?: LambdaConte
 
   try {
     await deleteCaddyRoute(ingressIp, routeId);
+    await deleteCaddyRoute(ingressIp, canonicalRouteId(routeId));
     await persistCaddyConfig(ingressIp);
   } catch (error) {
     if (isUnreachable(error)) {

@@ -82,20 +82,33 @@ export class SoloEc2Service extends Construct {
 export interface SoloExposeServiceProps {
   readonly provider: Provider;
   readonly serviceName: string;
-  readonly clusterName: string;
+  readonly namespace: HttpNamespace;
+  readonly port: number;
+  /**
+   * Canonical hostname served by Caddy (the final server name).
+   */
+  readonly domain: string;
+  /**
+   * Extra hostnames that 308-redirect to `domain`.
+   */
+  readonly additionalDomains?: string[];
 }
 
 export class SoloExposeService extends Construct {
   constructor(scope: Construct, id: string, props: SoloExposeServiceProps) {
     super(scope, id);
 
-    const { provider, serviceName, clusterName } = props;
+    const { provider, serviceName, namespace, port, domain, additionalDomains = [] } = props;
 
     new CustomResource(this, `${id}--expose-service`, {
       serviceToken: provider.serviceToken,
       resourceType: 'Custom::SoloExposeService',
       properties: {
-        serviceName: `${clusterName}-${serviceName}`,
+        serviceName,
+        namespaceArn: namespace.namespaceArn,
+        port,
+        domain,
+        additionalDomains,
       },
     });
 

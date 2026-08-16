@@ -8,7 +8,6 @@ import { RetentionDays } from 'aws-cdk-lib/aws-logs';
 import { Asset } from 'aws-cdk-lib/aws-s3-assets';
 import * as servicediscovery from 'aws-cdk-lib/aws-servicediscovery';
 import { Construct } from 'constructs';
-import { SoloClusterControlPlane } from './control-plane';
 
 export interface SoloEC2ClusterProps {
   readonly clusterName: string;
@@ -22,9 +21,10 @@ export class SoloEC2Cluster extends Construct {
 
   private readonly clusterName: string;
   private readonly id: string;
-  public controlPlane?: SoloClusterControlPlane;
   public readonly namespace: servicediscovery.HttpNamespace;
   public readonly clusterSecurityGroup: ec2.SecurityGroup;
+  public readonly caddyConfigBucket: string;
+  public readonly caddyConfigKey: string;
 
   constructor(scope: Construct, id: string, props: SoloEC2ClusterProps) {
     super(scope, id);
@@ -47,6 +47,18 @@ export class SoloEC2Cluster extends Construct {
 
     const vpc = ec2.Vpc.fromLookup(this, `${id}/vpc`, {
       isDefault: true,
+    });
+
+    vpc.addGatewayEndpoint('s3-gateway', {
+      service: ec2.GatewayVpcEndpointAwsService.S3,
+    });
+
+    vpc.addInterfaceEndpoint('servicediscovery', {
+      service: ec2.InterfaceVpcEndpointAwsService.CLOUD_MAP_SERVICE_DISCOVERY,
+    });
+
+    vpc.addInterfaceEndpoint('servicediscovery-data', {
+      service: ec2.InterfaceVpcEndpointAwsService.CLOUD_MAP_DATA_SERVICE_DISCOVERY,
     });
 
     new ecs.CfnCluster(this, `${id}/cluster`, {
@@ -110,11 +122,13 @@ export class SoloEC2Cluster extends Construct {
 
     Tags.of(asg).add('Name', `${clusterName}-asg`, { applyToLaunchedInstances: true });
 
-    this.enableLoadBalancer(namespace);
+    const caddyConfig = this.enableLoadBalancer(namespace);
+    this.caddyConfigBucket = caddyConfig.s3BucketName;
+    this.caddyConfigKey = caddyConfig.s3ObjectKey;
 
   }
 
-  enableLoadBalancer(namespace: servicediscovery.HttpNamespace) {
+  private enableLoadBalancer(namespace: servicediscovery.HttpNamespace): Asset {
 
     const taskDefinition = new ecs.Ec2TaskDefinition(this, `${this.id}/task_definition`, {
       family: `${this.clusterName}-ingress`,
@@ -159,6 +173,9 @@ export class SoloEC2Cluster extends Construct {
       essential: true,
       cpu: 0,
       memoryReservationMiB: 128,
+      environment: {
+        CADDY_ADMIN: '0.0.0.0:2019',
+      },
       command: [
         'caddy',
         'run',
@@ -213,6 +230,7 @@ export class SoloEC2Cluster extends Construct {
       },
     });
 
+    return defaultCaddyConfig;
   }
 
 }
