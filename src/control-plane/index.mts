@@ -1,4 +1,3 @@
-import { CloudFormationCustomResourceEvent } from "aws-lambda";
 
 export const handler = async (event: any, context?: any) => {
   if (event && event.RequestType && event.StackId && event.ResourceType) {

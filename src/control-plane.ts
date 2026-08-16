@@ -1,11 +1,11 @@
-import { SecurityGroup, Vpc } from "aws-cdk-lib/aws-ec2";
-import { Function, Runtime } from "aws-cdk-lib/aws-lambda";
-import { NodejsFunction } from "aws-cdk-lib/aws-lambda-nodejs";
-import { Construct } from "constructs";
-import { resolve } from "path";
+import { resolve } from 'path';
+import { SecurityGroup, Vpc } from 'aws-cdk-lib/aws-ec2';
+import { Function, Runtime } from 'aws-cdk-lib/aws-lambda';
+import { NodejsFunction } from 'aws-cdk-lib/aws-lambda-nodejs';
+import { Construct } from 'constructs';
 
 export interface SoloClusterControlPlaneProps {
-  readonly clusterName: string
+  readonly clusterName: string;
 }
 
 export class SoloClusterControlPlane extends Construct {
@@ -39,8 +39,8 @@ export class SoloClusterControlPlane extends Construct {
       },
       vpc,
       securityGroups: [securityGroup],
-      allowPublicSubnet: true
-    })
+      allowPublicSubnet: true,
+    });
 
     this.controlPlane = controlPlane as Function;
 

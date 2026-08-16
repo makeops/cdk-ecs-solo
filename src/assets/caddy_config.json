@@ -13,11 +13,11 @@
 						{
 							"handle": [
 								{
-									"body": "{ \"status\": \"ok\" }",
+									"body": "ok",
 									"handler": "static_response",
 									"status_code": 200,
 									"headers": {
-                    "Content-Type": ["application/json"]
+                    "Content-Type": ["text/plain"]
                   }
 								}
 							]
