@@ -21,6 +21,8 @@ const project = new awscdk.AwsCdkConstructLibrary({
 
   typescriptVersion: '~5.8.2',
 
+  npmAccess: javascript.NpmAccess.PUBLIC,
+
   gitignore: [
     '_infra/',
     '.cursor/',

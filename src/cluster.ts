@@ -14,6 +14,7 @@ export interface SoloEC2ClusterProps {
   readonly clusterName: string;
   readonly instanceType?: ec2.InstanceType;
   readonly architecture?: ec2.InstanceArchitecture;
+  readonly enableSsm?: boolean;
 }
 
 
@@ -22,6 +23,7 @@ export class SoloEC2Cluster extends Construct {
   private readonly clusterName: string;
   private readonly id: string;
   public controlPlane?: SoloClusterControlPlane;
+  public readonly namespace: servicediscovery.HttpNamespace;
 
   constructor(scope: Construct, id: string, props: SoloEC2ClusterProps) {
     super(scope, id);
@@ -30,14 +32,17 @@ export class SoloEC2Cluster extends Construct {
       clusterName,
       instanceType,
       architecture,
+      enableSsm = true,
     } = props;
 
     this.clusterName = clusterName;
     this.id = id;
 
-    new servicediscovery.HttpNamespace(this, `${id}--namespace`, {
+    const namespace = new servicediscovery.HttpNamespace(this, `${id}--namespace`, {
       name: 'solo.local',
     });
+
+    this.namespace = namespace;
 
     const vpc = ec2.Vpc.fromLookup(this, `${id}/vpc`, {
       isDefault: true,
@@ -66,6 +71,10 @@ export class SoloEC2Cluster extends Construct {
     });
 
     instanceRole.addManagedPolicy(iam.ManagedPolicy.fromAwsManagedPolicyName('service-role/AmazonEC2ContainerServiceforEC2Role'));
+
+    if (enableSsm) {
+      instanceRole.addManagedPolicy(iam.ManagedPolicy.fromAwsManagedPolicyName('AmazonSSMManagedInstanceCore'));
+    }
 
     const instanceSecurityGroup = new ec2.SecurityGroup(this, `${id}/instance_security_group`, {
       vpc,
@@ -98,11 +107,11 @@ export class SoloEC2Cluster extends Construct {
 
     Tags.of(asg).add('Name', `${clusterName}-asg`, { applyToLaunchedInstances: true });
 
-    this.enableLoadBalancer();
+    this.enableLoadBalancer(namespace);
 
   }
 
-  enableLoadBalancer() {
+  enableLoadBalancer(namespace: servicediscovery.HttpNamespace) {
 
     const taskDefinition = new ecs.Ec2TaskDefinition(this, `${this.id}/task_definition`, {
       family: `${this.clusterName}-ingress`,
@@ -190,6 +199,10 @@ export class SoloEC2Cluster extends Construct {
         minimumHealthyPercent: 0,
         maximumPercent: 100,
       },
+      serviceConnectConfiguration: {
+        enabled: true,
+        namespace: namespace.namespaceArn
+      }
     });
 
   }

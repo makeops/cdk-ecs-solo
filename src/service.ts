@@ -1,6 +1,7 @@
 import { CustomResource } from 'aws-cdk-lib';
-import { AvailabilityZoneRebalancing, CfnService, ContainerImage, Ec2TaskDefinition, LogDriver, Protocol, Secret } from 'aws-cdk-lib/aws-ecs';
+import { AppProtocol, AvailabilityZoneRebalancing, CfnService, ContainerImage, Ec2TaskDefinition, LogDriver, Protocol, Secret } from 'aws-cdk-lib/aws-ecs';
 import { RetentionDays } from 'aws-cdk-lib/aws-logs';
+import { HttpNamespace } from 'aws-cdk-lib/aws-servicediscovery';
 import { Provider } from 'aws-cdk-lib/custom-resources';
 import { Construct } from 'constructs';
 
@@ -11,6 +12,7 @@ export interface SoloEc2ServiceProps {
   readonly externalPort?: number;
   readonly environment?: { [key: string]: string };
   readonly secrets?: { [key: string]: Secret };
+  readonly namespace: HttpNamespace;
 }
 
 export class SoloEc2Service extends Construct {
@@ -24,6 +26,7 @@ export class SoloEc2Service extends Construct {
       externalPort = 8000,
       environment,
       secrets,
+      namespace,
     } = props;
 
     const taskDefinition = new Ec2TaskDefinition(this, `${id}--task-def`, {
@@ -43,6 +46,7 @@ export class SoloEc2Service extends Construct {
           containerPort: externalPort,
           name: 'exposed-port',
           protocol: Protocol.TCP,
+          appProtocol: AppProtocol.http
         }
       ],
       ...(environment ? { environment } : {}),
@@ -59,6 +63,17 @@ export class SoloEc2Service extends Construct {
         minimumHealthyPercent: 100,
         maximumPercent: 200,
       },
+      serviceConnectConfiguration: {
+        enabled: true,
+        namespace: namespace.namespaceArn,
+        services: [{
+          discoveryName: `${serviceName}`,
+          portName: 'exposed-port',
+          clientAliases: [{
+            port: externalPort,
+          }]
+        }]
+      }
     });
 
   }
