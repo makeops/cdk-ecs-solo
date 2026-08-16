@@ -12,7 +12,7 @@ Not all projects require a full, best-practice deployment behind a load balancer
 
 ## Support
 
-Questions or need help with this construct? [Contact MakeOps](https://www.makeops.com/contact).
+Questions or need help with this construct? Contact [MakeOps Team](https://www.makeops.com/contact).
 
 ## Why
 

@@ -17,7 +17,7 @@ const project = new awscdk.AwsCdkConstructLibrary({
 
   description: 'A CDK construct to deploy an app to a single EC2 instance using ECS',
 
-  keywords: ['awscdk', 'cdk', 'ecs'],
+  keywords: ['aws-cdk', 'aws-cdk-construct', 'cdk', 'ecs', 'projen'],
 
   typescriptVersion: '~5.8.2',
 
@@ -29,6 +29,11 @@ const project = new awscdk.AwsCdkConstructLibrary({
   ],
 
   majorVersion: 0,
+
+  devDeps: [
+    '@aws-sdk/client-s3',
+    '@aws-sdk/client-servicediscovery',
+  ],
 
   pnpmOptions: {
     workspaceYamlOptions: {

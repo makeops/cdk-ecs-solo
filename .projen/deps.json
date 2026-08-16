@@ -1,6 +1,14 @@
 {
   "dependencies": [
     {
+      "name": "@aws-sdk/client-s3",
+      "type": "build"
+    },
+    {
+      "name": "@aws-sdk/client-servicediscovery",
+      "type": "build"
+    },
+    {
       "name": "@stylistic/eslint-plugin",
       "version": "^2",
       "type": "build"

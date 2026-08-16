@@ -36,6 +36,8 @@
     "organization": true
   },
   "devDependencies": {
+    "@aws-sdk/client-s3": "^3.1111.0",
+    "@aws-sdk/client-servicediscovery": "^3.1111.0",
     "@stylistic/eslint-plugin": "^2",
     "@types/jest": "^30.0.0",
     "@types/node": "ts5.8",
@@ -65,9 +67,11 @@
   },
   "pnpm": {},
   "keywords": [
-    "awscdk",
+    "aws-cdk",
+    "aws-cdk-construct",
     "cdk",
-    "ecs"
+    "ecs",
+    "projen"
   ],
   "devEngines": {
     "packageManager": {

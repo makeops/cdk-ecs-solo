@@ -326,7 +326,7 @@
             "--peer",
             "--no-deprecated",
             "--dep=dev,prod,peer,optional",
-            "--filter=@types/jest,eslint-import-resolver-typescript,eslint-plugin-import,jest,jsii-diff,jsii-pacmak,projen,ts-jest,ts-node"
+            "--filter=@aws-sdk/client-s3,@aws-sdk/client-servicediscovery,@types/jest,eslint-import-resolver-typescript,eslint-plugin-import,jest,jsii-diff,jsii-pacmak,projen,ts-jest,ts-node"
           ]
         },
         {
@@ -336,6 +336,8 @@
           "execArgs": [
             "pnpm",
             "update",
+            "@aws-sdk/client-s3",
+            "@aws-sdk/client-servicediscovery",
             "@stylistic/eslint-plugin",
             "@types/jest",
             "@types/node",
