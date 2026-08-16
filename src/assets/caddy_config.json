@@ -1,0 +1,30 @@
+{
+	"admin": {
+		"listen": "0.0.0.0:2019"
+	},
+	"apps": {
+		"http": {
+			"servers": {
+				"srv0": {
+					"listen": [
+						"0.0.0.0:80"
+					],
+					"routes": [
+						{
+							"handle": [
+								{
+									"body": "{ \"status\": \"ok\" }",
+									"handler": "static_response",
+									"status_code": 200,
+									"headers": {
+                    "Content-Type": ["application/json"]
+                  }
+								}
+							]
+						}
+					]
+				}
+			}
+		}
+	}
+}
