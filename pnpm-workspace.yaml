@@ -2,3 +2,5 @@
 
 allowBuilds:
   unrs-resolver: true
+  "@swc/core": true
+  esbuild: true

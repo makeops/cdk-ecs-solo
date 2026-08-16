@@ -1,25 +1,25 @@
-import { awscdk, javascript } from "projen";
+import { awscdk, javascript } from 'projen';
 const project = new awscdk.AwsCdkConstructLibrary({
-  author: "Jason Forte (MakeOps)",
-  authorAddress: "https://www.makeops.com",
+  author: 'Jason Forte (MakeOps)',
+  authorAddress: 'https://www.makeops.com',
   authorOrganization: true,
-  authorName: "MakeOps",
-  cdkVersion: "2.265.0",
-  jsiiVersion: "~6.0.0",
-  license: "Apache-2.0",
-  name: "@makeops/cdk-ecs-solo",
+  authorName: 'MakeOps',
+  cdkVersion: '2.265.0',
+  jsiiVersion: '~6.0.0',
+  license: 'Apache-2.0',
+  name: '@makeops/cdk-ecs-solo',
   packageManager: javascript.NodePackageManager.PNPM,
-  pnpmVersion: "11.21.0",
+  pnpmVersion: '11.21.0',
 
   projenrcTs: true,
-  repositoryUrl: "https://github.com/makeops/cdk-ecs-solo",
-  homepage: "https://github.com/makeops/cdk-ecs-solo",
+  repositoryUrl: 'https://github.com/makeops/cdk-ecs-solo',
+  homepage: 'https://github.com/makeops/cdk-ecs-solo',
 
-  description: "A CDK construct to deploy an app to a single EC2 instance using ECS",
+  description: 'A CDK construct to deploy an app to a single EC2 instance using ECS',
 
   keywords: ['awscdk', 'cdk', 'ecs'],
 
-  typescriptVersion: "~5.8.2",
+  typescriptVersion: '~5.8.2',
 
   gitignore: [
     '_infra/',
@@ -31,10 +31,12 @@ const project = new awscdk.AwsCdkConstructLibrary({
   pnpmOptions: {
     workspaceYamlOptions: {
       allowBuilds: {
-        'unrs-resolver': true
-      }
-    }
-  }
+        'unrs-resolver': true,
+        '@swc/core': true,
+        'esbuild': true,
+      },
+    },
+  },
 
   // defaultReleaseBranch: "main",  /* The name of the main release branch. */
   // deps: [],                      /* Runtime dependencies of this module. */
