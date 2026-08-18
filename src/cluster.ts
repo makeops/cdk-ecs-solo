@@ -49,18 +49,6 @@ export class SoloEC2Cluster extends Construct {
       isDefault: true,
     });
 
-    vpc.addGatewayEndpoint('s3-gateway', {
-      service: ec2.GatewayVpcEndpointAwsService.S3,
-    });
-
-    vpc.addInterfaceEndpoint('servicediscovery', {
-      service: ec2.InterfaceVpcEndpointAwsService.CLOUD_MAP_SERVICE_DISCOVERY,
-    });
-
-    vpc.addInterfaceEndpoint('servicediscovery-data', {
-      service: ec2.InterfaceVpcEndpointAwsService.CLOUD_MAP_DATA_SERVICE_DISCOVERY,
-    });
-
     new ecs.CfnCluster(this, `${id}/cluster`, {
       clusterName,
     });

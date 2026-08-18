@@ -1,8 +1,7 @@
-import { CustomResource } from 'aws-cdk-lib';
+import { CustomResource, Duration } from 'aws-cdk-lib';
 import { AvailabilityZoneRebalancing, CfnService, ContainerImage, Ec2TaskDefinition, LogDriver, Protocol, Secret } from 'aws-cdk-lib/aws-ecs';
 import { RetentionDays } from 'aws-cdk-lib/aws-logs';
 import { HttpNamespace } from 'aws-cdk-lib/aws-servicediscovery';
-import { Provider } from 'aws-cdk-lib/custom-resources';
 import { Construct } from 'constructs';
 
 export interface SoloEc2ServiceProps {
@@ -80,7 +79,10 @@ export class SoloEc2Service extends Construct {
 
 
 export interface SoloExposeServiceProps {
-  readonly provider: Provider;
+  /**
+   * Dispatcher Lambda ARN from `SoloClusterControlPlane.serviceToken`.
+   */
+  readonly serviceToken: string;
   readonly serviceName: string;
   readonly namespace: HttpNamespace;
   readonly port: number;
@@ -98,11 +100,12 @@ export class SoloExposeService extends Construct {
   constructor(scope: Construct, id: string, props: SoloExposeServiceProps) {
     super(scope, id);
 
-    const { provider, serviceName, namespace, port, domain, additionalDomains = [] } = props;
+    const { serviceToken, serviceName, namespace, port, domain, additionalDomains = [] } = props;
 
     new CustomResource(this, `${id}--expose-service`, {
-      serviceToken: provider.serviceToken,
+      serviceToken,
       resourceType: 'Custom::SoloExposeService',
+      serviceTimeout: Duration.minutes(5),
       properties: {
         serviceName,
         namespaceArn: namespace.namespaceArn,
