@@ -9,6 +9,10 @@
       "type": "build"
     },
     {
+      "name": "@aws-sdk/client-sfn",
+      "type": "build"
+    },
+    {
       "name": "@stylistic/eslint-plugin",
       "version": "^2",
       "type": "build"

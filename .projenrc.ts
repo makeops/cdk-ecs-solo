@@ -33,6 +33,7 @@ const project = new awscdk.AwsCdkConstructLibrary({
   devDeps: [
     '@aws-sdk/client-s3',
     '@aws-sdk/client-servicediscovery',
+    '@aws-sdk/client-sfn',
   ],
 
   pnpmOptions: {
